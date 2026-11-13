@@ -7,8 +7,10 @@
 (function (root) {
   'use strict';
 
+  function isLite() { return document.documentElement.classList.contains('lite'); }
+
   function fitCanvas(canvas, ctx) {
-    var dpr = Math.min(root.devicePixelRatio || 1, 2);
+    var dpr = Math.min(root.devicePixelRatio || 1, isLite() ? 1.5 : 2);
     var w = root.innerWidth;
     var h = root.innerHeight;
     canvas.width = Math.round(w * dpr);
@@ -45,7 +47,7 @@
 
   ParticleField.prototype.resize = function () {
     this.size = fitCanvas(this.canvas, this.ctx);
-    var target = Math.round(Math.min(110, (this.size.w * this.size.h) / 15000));
+    var target = Math.round(Math.min(isLite() ? 26 : 110, (this.size.w * this.size.h) / 15000));
     var list = this.particles;
     while (list.length < target) list.push(this.spawn(true));
     list.length = target;
@@ -83,6 +85,8 @@
   };
 
   ParticleField.prototype.frame = function (now) {
+    // Lite devices: draw at ~30 fps.
+    if (isLite() && now - this.last < 30) { this.raf = requestAnimationFrame(this._frame); return; }
     var dt = Math.min(50, now - this.last) / 16.67;
     this.last = now;
     var w = this.size.w, h = this.size.h;
@@ -101,13 +105,14 @@
     var ctx = this.ctx;
     var list = this.particles;
     var w = this.size.w, h = this.size.h;
+    var lite = isLite();
     ctx.clearRect(0, 0, w, h);
-    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalCompositeOperation = lite ? 'source-over' : 'lighter';
 
-    // Faint links between nearby dots.
+    // Faint links between nearby dots (skipped on lite devices).
     var maxD = 120, maxD2 = maxD * maxD;
     ctx.lineWidth = 0.6;
-    for (var i = 0; i < list.length; i++) {
+    for (var i = 0; i < list.length && !lite; i++) {
       var a = list[i];
       for (var j = i + 1; j < list.length; j++) {
         var b = list[j];
@@ -128,9 +133,11 @@
       var p = list[k];
       var o = 0.35 + 0.45 * (0.5 + 0.5 * Math.sin(p.phase));
       ctx.fillStyle = 'rgba(' + p.c + ',' + (o * 0.18).toFixed(3) + ')';
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r * 4, 0, Math.PI * 2);
-      ctx.fill();
+      if (!lite) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.fillStyle = 'rgba(' + p.c + ',' + o.toFixed(3) + ')';
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
@@ -194,7 +201,7 @@
     var light = options && options.reduced;
     var w = this.size.w, h = this.size.h;
     var scale = Math.max(0.6, Math.min(1.4, w / 1366));
-    var n = light ? 0.35 : 1;
+    var n = light ? 0.35 : (isLite() ? 0.55 : 1);
 
     function wave(mult) {
       var c = Math.round(110 * mult * n);
@@ -206,7 +213,7 @@
     wave(1);
     if (light) return;
     this.timers.push(setTimeout(function () { wave(0.7); }, 420));
-    if (big) {
+    if (big && !isLite()) {
       this.timers.push(setTimeout(function () { wave(0.9); }, 900));
       this.timers.push(setTimeout(function () { self.rain(colors, 2600); }, 1200));
     }

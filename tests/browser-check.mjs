@@ -116,19 +116,22 @@ async function waitFor(expr, timeout = 12000, step = 40) {
 async function setViewport(width, height, mobile = false) {
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: mobile ? 3 : 1, mobile });
 }
-async function load() {
-  await send('Page.navigate', { url: pageUrl });
+async function load(query = '') {
+  await send('Page.navigate', { url: pageUrl + query });
   await waitFor(`document.readyState === 'complete' && !!window.RayuSpinApp`, 10000);
   await sleep(700);
 }
 
 // Geometry read straight from the DOM: which segment is physically under the pointer tip?
 const SEGMENT_UNDER_POINTER = `(() => {
+  const area = document.querySelector('.wheel-area');
+  area.style.pointerEvents = 'auto'; // the wheel ignores clicks; enable hit-testing just for this probe
   const w = document.getElementById('wheel').getBoundingClientRect();
   const p = document.querySelector('.pointer-svg').getBoundingClientRect();
   const x = p.left + p.width / 2;
   const y = p.bottom + w.height * 0.06;     // just below the pointer tip
   const seg = document.elementsFromPoint(x, y).map((e) => e.closest && e.closest('.seg')).find(Boolean);
+  area.style.pointerEvents = '';
   return seg ? seg.getAttribute('data-prize') : null;
 })()`;
 
@@ -172,6 +175,8 @@ try {
     check(L.wheel.top >= 0 && L.wheel.bottom <= L.footer.top && L.wheel.right <= L.vw, `wheel fits (${Math.round(L.wheel.w)}px, top ${Math.round(L.wheel.top)}, bottom ${Math.round(L.wheel.bottom)})`);
     check(L.pointer.top >= L.header.bottom - 1, `pointer below header (${Math.round(L.pointer.top)} ≥ ${Math.round(L.header.bottom)})`);
     check(L.btn.bottom <= L.footer.top && L.hint.bottom <= L.footer.top && L.title.top >= L.header.bottom, 'title, button and hint visible');
+    const hit = await evaluate(`(() => { const r = document.getElementById('spin-btn').getBoundingClientRect(); return [0.5, 0.15, 0.85].map((f) => { const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height * f); return !!(e && e.closest('#spin-btn')); }); })()`);
+    check(hit.every(Boolean), 'SPIN NOW is clickable across its whole height (nothing overlaps it)');
     check(L.logos.every(Boolean) && L.hubLogo, `logo images loaded offline (${L.logos.length} <img> + hub)`);
     await screenshot(`ready-${w}x${h}`);
   }
@@ -326,6 +331,25 @@ try {
   check(rd < 3500 && rgeo === rshown, `reduced-motion spin took ${(rd / 1000).toFixed(1)}s and matches (${rgeo})`);
   await send('Emulation.setEmulatedMedia', { features: [] });
 
+  log('\n== Lite mode (phones/tablets) ==');
+  await setViewport(390, 844, false);
+  await load('?lite=1');
+  check(await evaluate(`document.documentElement.classList.contains('lite')`), '?lite=1 turns lite mode on');
+  await clickEl('#spin-btn');
+  await sleep(600);
+  const particlesPaused = await evaluate(`RayuSpinApp.getPhase() === 'spinning'`);
+  check(particlesPaused, 'spin runs in lite mode');
+  await waitFor(`RayuSpinApp.getPhase() === 'result'`, 12000, 25);
+  const lg = await evaluate(SEGMENT_UNDER_POINTER);
+  await waitFor(`document.getElementById('result').classList.contains('is-open')`, 3000);
+  await sleep(1200);
+  const lshown = await evaluate(`document.getElementById('result-value').textContent + ' OFF'`);
+  check(lg === lshown, `lite mode: pointer "${lg}" matches popup "${lshown}"`);
+  await clickEl('#spin-again-btn');
+  check(await waitFor(`RayuSpinApp.getPhase() === 'ready'`, 2000), 'lite mode: SPIN AGAIN resets');
+  await load('?lite=0');
+  check(await evaluate(`!document.documentElement.classList.contains('lite')`), '?lite=0 forces full effects');
+
   for (const [w, h, name] of [[390, 844, 'phone'], [820, 1180, 'tablet'], [1366, 600, 'laptop-browser-window']]) {
     log(`\n== ${name} ${w}x${h} ==`);
     await setViewport(w, h, name === 'phone');
@@ -336,6 +360,8 @@ try {
     check(hdr.right <= L.vw && hdr.left >= hdr.brandRight, `header buttons fully visible (right edge ${Math.round(hdr.right)} ≤ ${L.vw})`);
     const panel = await evaluate(`(() => { document.getElementById('settings-toggle').click(); const r = document.getElementById('settings-panel').getBoundingClientRect(); document.getElementById('settings-toggle').click(); return { l: r.left, r: r.right }; })()`);
     check(panel.l >= 0 && panel.r <= L.vw, `settings panel on screen (${Math.round(panel.l)}–${Math.round(panel.r)})`);
+    const hit2 = await evaluate(`(() => { const r = document.getElementById('spin-btn').getBoundingClientRect(); return [0.5, 0.15, 0.85].map((f) => { const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height * f); return !!(e && e.closest('#spin-btn')); }); })()`);
+    check(hit2.every(Boolean), `${name}: SPIN NOW clickable across its whole height`);
     check(L.wheel.left >= 0 && L.wheel.right <= L.vw, `wheel within width (${Math.round(L.wheel.w)}px)`);
     if (name !== 'laptop-browser-window') check(L.scrollH <= L.vh + 2, `fits without vertical scroll (${L.scrollH} vs ${L.vh})`);
     else check(L.scrollH <= L.vh, `fits short window (${L.scrollH} vs ${L.vh})`);

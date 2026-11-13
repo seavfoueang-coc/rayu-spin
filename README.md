@@ -65,6 +65,10 @@ node tests/browser-check.mjs 16    # real Edge, offline: 16 spins, layout, sound
 
 ## Troubleshooting
 
+- **Lag on a phone or tablet:** the page switches to a lighter look automatically on
+  touch, small or low-memory devices (same design, fewer glows and animations). To force
+  it on any device, add `?lite=1` to the address, e.g. `index.html?lite=1`. Use `?lite=0`
+  to force the full effects.
 - **No sound:** click the 🔊 button once and check the Windows volume.
 - **Wheel looks too small or too big:** press F11 for fullscreen, and reset browser
   zoom with Ctrl + 0.

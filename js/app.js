@@ -14,6 +14,23 @@
   var F = window.RayuFairness;
   var Effects = window.RayuEffects;
 
+  /* Lite mode: fewer glows/shadows/animations so phones and tablets stay smooth.
+     Automatic on touch / small / low-memory devices. Force with ?lite=1 or ?lite=0. */
+  (function detectLite() {
+    var q = /[?&]lite=([01])/.exec(window.location.search);
+    var lite;
+    if (q) {
+      lite = q[1] === '1';
+    } else {
+      var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      var small = Math.min(window.screen.width, window.screen.height) < 820;
+      var lowMem = navigator.deviceMemory && navigator.deviceMemory <= 4;
+      var lowCpu = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4;
+      lite = !!(coarse || small || lowMem || lowCpu);
+    }
+    if (lite) document.documentElement.classList.add('lite');
+  })();
+
   /* ------------------------------------------------------------------ */
   /* Configuration                                                       */
   /* ------------------------------------------------------------------ */
@@ -342,6 +359,10 @@
     spinBtn.disabled = busy;
     spinBtn.setAttribute('aria-disabled', busy ? 'true' : 'false');
     spinLabel.textContent = phase === 'spinning' ? 'SPINNING…' : (phase === 'result' ? 'WINNER!' : 'SPIN NOW');
+    // Free the GPU/CPU for the wheel: the background particles rest while it spins.
+    if (typeof particles !== 'undefined' && !state.reduced) {
+      if (phase === 'spinning') particles.stop(); else particles.start();
+    }
   }
 
   function announce(text) {

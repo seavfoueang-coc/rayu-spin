@@ -536,6 +536,9 @@ body[data-phase="spinning"] .spin-btn:disabled { color: var(--cyan); }
   display: grid;
   place-items: center;
   min-height: 0;
+  /* The wheel is display-only. Its rotating square box sticks out past the
+     circle, so it must never swallow taps meant for the SPIN NOW button. */
+  pointer-events: none;
 }
 
 .wheel {
@@ -923,6 +926,44 @@ body[data-phase="spinning"] .spin-btn:disabled { color: var(--cyan); }
 @media (min-aspect-ratio: 5/4) and (max-height: 620px) {
   .eyebrow, .odds { display: none; }
 }
+
+/* --------------------------------------------------------------------------
+   Lite mode (phones / tablets / weak laptops): same look, far fewer
+   expensive effects, so the wheel spins smoothly.
+   -------------------------------------------------------------------------- */
+
+html.lite .bg-grid { animation: none; }
+html.lite .bg-glow::before,
+html.lite .bg-glow::after { animation: none; filter: none; opacity: 0.5; }
+html.lite .topbar,
+html.lite .result-overlay { -webkit-backdrop-filter: none; backdrop-filter: none; }
+html.lite .result-overlay { background: rgba(3, 6, 14, 0.93); }
+
+html.lite .wheel-aura { filter: none; animation: none; opacity: 0.8; }
+html.lite .pointer,
+html.lite .wheel.has-result .pointer { filter: none; }
+html.lite .seg-label,
+html.lite .rim-neon,
+html.lite .wheel-overlay circle { filter: none; }
+html.lite .divider-glow { display: none; }
+
+html.lite .wheel[data-phase="ready"] .led,
+html.lite .wheel[data-phase="spinning"] .led { animation: none; opacity: 0.85; }
+html.lite .wheel[data-phase="result"] .led { animation-duration: 0.8s; }
+
+html.lite .btn-primary::before,
+html.lite .btn-primary::after { animation: none; }
+html.lite .btn-primary::after { display: none; }
+html.lite .t-word,
+html.lite .t-amp,
+html.lite .congrats-text,
+html.lite .result-value { filter: none; }
+html.lite .result-rays { animation: none; }
+html.lite .is-open .result-value { animation: prize-pop 0.9s 0.18s var(--ease-out) both; }
+html.lite .spark { filter: none; }
+html.lite .is-open .spark-big,
+html.lite .is-open .spark-small { animation: none; }
+html.lite .live-dot, html.lite .badge-dot { animation: none; }
 
 /* --------------------------------------------------------------------------
    Reduced motion
